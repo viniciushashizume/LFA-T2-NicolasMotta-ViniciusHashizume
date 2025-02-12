@@ -1,63 +1,131 @@
-class FiniteAutomaton:
-    def __init__(self, states, alphabet, transitions, start_state, final_states, deterministic=True):
-        self.states = states
-        self.alphabet = alphabet
-        self.transitions = transitions  # Dict[state][symbol] = set(next_states)
-        self.start_state = start_state
-        self.final_states = final_states
-        self.deterministic = deterministic
+class AutomatoFinito:
+    def __init__(self, estados, alfabeto, transicoes, estado_inicial, estados_finais, deterministico=True):
+        self.estados = estados
+        self.alfabeto = alfabeto
+        self.transicoes = transicoes
+        self.estado_inicial = estado_inicial
+        self.estados_finais = estados_finais
+        self.deterministico = deterministico
+
+    def verificarDeterministico(self):
+        for estado in self.estados:
+            for simbolo in self.alfabeto:
+                # verifica se há mais de um estado de destino para o mesmo símbolo
+                if estado in self.transicoes and simbolo in self.transicoes[estado]:
+                    if len(self.transicoes[estado][simbolo]) > 1:
+                        return False
+                # verifica se há transições ε 
+                if estado in self.transicoes and '' in self.transicoes[estado]:
+                    return False
+        return True
 
     def __str__(self):
-        result = f"M = ({self.alphabet}, {self.states}, δ, {self.start_state}, {self.final_states})\n"
-        result += "Transições:\n"
-        for state, transitions in self.transitions.items():
-            for symbol, next_states in transitions.items():
-                result += f"  δ({state}, {symbol}) -> {', '.join(next_states)}\n"
-        return result
+        resultado = f"M = ({self.alfabeto}, {self.estados}, δ, {self.estado_inicial}, {self.estados_finais})\n"
+        resultado += "Transições:\n"
+        for estado, transicoes in self.transicoes.items():
+            for simbolo, proximos_estados in transicoes.items():
+                resultado += f"  δ({estado}, {simbolo}) -> {', '.join(proximos_estados)}\n"
+        return resultado
 
-class RegularGrammar:
-    def __init__(self, automaton):
-        self.non_terminals = automaton.states | {"S"}
-        self.terminals = automaton.alphabet
-        self.start_symbol = "S"
-        self.productions = self.generate_productions(automaton)
+class GramaticaRegular:
+    def __init__(self, automato):
+        self.nao_terminais = automato.estados | {"S"}
+        self.terminais = automato.alfabeto
+        self.simbolo_inicial = "S"
+        self.producoes = self.gerarProducoes(automato)
 
-    def generate_productions(self, automaton):
-        productions = {state: [] for state in automaton.states}
-        productions["S"] = [f"{automaton.start_state}"]
-        
-        for state, transitions in automaton.transitions.items():
-            for symbol, next_states in transitions.items():
-                for next_state in next_states:
-                    productions[state].append(f"{symbol}{next_state}")
-        
-        for final_state in automaton.final_states:
-            productions[final_state].append("ε")
+    def gerarProducoes(self, automato):
+        producoes = {estado: [] for estado in automato.estados}
+        producoes["S"] = [f"{automato.estado_inicial}"]
+       
+        for estado, transicoes in automato.transicoes.items():
+            for simbolo, proximos_estados in transicoes.items():
+                for proximo_estado in proximos_estados:
+                    producoes[estado].append(f"{simbolo}{proximo_estado}")
+       
+        for estado_final in automato.estados_finais:
+            producoes[estado_final].append("ε")
 
-        return productions
+        return producoes
 
     def __str__(self):
-        result = f"G = ({self.non_terminals}, {self.terminals}, P, {self.start_symbol})\n"
-        result += "Produções:\n"
-        for non_terminal, rules in self.productions.items():
-            result += f"  {non_terminal} -> " + " | ".join(rules) + "\n"
-        return result
+        resultado = f"G = ({self.nao_terminais}, {self.terminais}, P, {self.simbolo_inicial})\n"
+        resultado += "Produções:\n"
+        for nao_terminal, regras in self.producoes.items():
+            resultado += f"  {nao_terminal} -> " + " | ".join(regras) + "\n"
+        return resultado
 
-# Definição do autômato de exemplo (NFA)
-states = {"q0", "q1", "q2"}
-alphabet = {"a", "b", "c"}
-transitions = {
-    "q0": {"a": {"q1"}, "b": {"q2", "q0"}},
-    "q1": {"b": {"q0"}, "c": {"q2"}},
-    "q2": {"a": {"q0"}}
-}
-start_state = "q0"
-final_states = {"q0", "q1", "q2"}
+def lerArquivo(nome_arquivo):
+    with open(nome_arquivo, 'r') as arquivo:
+        linhas = arquivo.readlines()
+   
+    estados = set(linhas[0].strip().split())
+    alfabeto = set(linhas[1].strip().split())
+   
+    transicoes = {}
+    for linha in linhas[2:]:
+        if linha.strip() == "":
+            break
+        partes = linha.strip().split()
+        estado = partes[0]
+        simbolo = partes[1]
+        proximos_estados = set(partes[2:])
+       
+        if estado not in transicoes:
+            transicoes[estado] = {}
+        transicoes[estado][simbolo] = proximos_estados
+   
+    estado_inicial = linhas[-2].strip()
+    estados_finais = set(linhas[-1].strip().split())
+   
+    # verificacoes
+    if not estados:
+        raise ValueError("Erro: O arquivo não contém estados.")
+    if not alfabeto:
+        raise ValueError("Erro: O arquivo não contém um alfabeto.")
+    if not estado_inicial:
+        raise ValueError("Erro: O arquivo não contém um estado inicial.")
+    if not estados_finais:
+        raise ValueError("Erro: O arquivo não contém estados finais.")
+    if estado_inicial not in estados:
+        raise ValueError("Erro: O estado inicial não está entre os estados do autômato.")
+    if '' in alfabeto:
+        raise ValueError("Erro: O alfabeto não pode conter o terminal vazio (ε).")
+    if not estados_finais.issubset(estados):
+        raise ValueError("Erro: Um ou mais estados finais não estão no conjunto de estados do autômato.")
 
-# Criando e exibindo o autômato
-automaton = FiniteAutomaton(states, alphabet, transitions, start_state, final_states, deterministic=False)
-print(automaton)
+    # verifica se os símbolos das transições estão no alfabeto
+    for estado, transicoes_por_estado in transicoes.items():
+        for simbolo in transicoes_por_estado.keys():
+            if simbolo not in alfabeto:
+                raise ValueError(f"Erro: O símbolo '{simbolo}' usado nas transições não está no alfabeto.")
 
-# Criando e exibindo a gramática correspondente
-grammar = RegularGrammar(automaton)
-print(grammar)
+    return AutomatoFinito(estados, alfabeto, transicoes, estado_inicial, estados_finais, deterministico=False)
+
+def escreverArquivo(automato, gramatica, nome_arquivo):
+    with open(nome_arquivo, 'w', encoding='utf-8') as arquivo:
+        arquivo.write("Informações do Autômato:\n")
+        arquivo.write(str(automato))
+        
+        # verifica se o automato é deterministico ou não deterministico
+        if automato.verificarDeterministico():
+            arquivo.write("\nO autômato é um AFD (Autômato Finito Determinístico).\n")
+        else:
+            arquivo.write("\nO autômato é um AFND (Autômato Finito Não Determinístico).\n")
+        
+        arquivo.write("\n\nInformações da Gramática Regular:\n")
+        arquivo.write(str(gramatica))
+
+def gerarArquivo(entrada, saida):
+    try:
+        automato = lerArquivo(entrada)
+        gramatica = GramaticaRegular(automato)
+        escreverArquivo(automato, gramatica, saida)
+    except ValueError as e:
+        with open(saida, 'w', encoding='utf-8') as arquivo:
+            arquivo.write(f"Erro: {str(e)}\n")
+        
+
+arquivoEntrada = 'automato.txt'
+arquivoSaida = 'saida.txt'
+gerarArquivo(arquivoEntrada, arquivoSaida)
