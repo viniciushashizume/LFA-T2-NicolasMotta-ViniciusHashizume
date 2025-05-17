@@ -59,6 +59,10 @@ def lerArquivo(nome_arquivo):
     with open(nome_arquivo, 'r') as arquivo:
         linhas = arquivo.readlines()
    
+    # Verifica se a última linha está vazia
+    if not linhas[-1].strip():
+        raise ValueError("Erro: Não há estados finais.")
+   
     estados = set(linhas[0].strip().split())
     alfabeto = set(linhas[1].strip().split())
    
